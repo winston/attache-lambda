@@ -1,0 +1,7 @@
+{
+  "name": "app",
+  "lambda": {
+    "memory": 1024
+  },
+  "profile": "apex-up"
+}
