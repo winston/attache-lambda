@@ -7,10 +7,10 @@ package main
 import (
   // "encoding/base64"
   // "io/ioutil"
-  "net/http"
-  "os"
   "fmt"
   "log"
+  "net/http"
+  "os"
 
   // "github.com/apex/log"
   // "github.com/apex/log/handlers/json"
@@ -30,7 +30,7 @@ func main() {
   http.HandleFunc("/upload", upload)
 
   if err := http.ListenAndServe(":" + os.Getenv("PORT"), nil); err != nil {
-    log.Fatalf("Error Listening: %s", err)
+    log.Fatalf(fmt.Sprintf("Error Listening - %s", err))
   }
 }
 
@@ -44,13 +44,12 @@ func upload(w http.ResponseWriter, r *http.Request) {
     file, handler, err := r.FormFile("file")
     if err != nil {
       // log.WithError(err).Error("Parsing Form")
-      http.Error(w, "Error Parsing Form: %s", http.StatusBadRequest)
+      http.Error(w, fmt.Sprintf("Error Parsing Form - %s", err), http.StatusBadRequest)
       return
     }
     defer file.Close()
 
-    fmt.Printf("%s", handler.Filename)
-    fmt.Printf("%s", handler.Header.Get("Content-Type"))
+    fmt.Fprintf(w, fmt.Sprintf("Uploaded: %s, of type %s", handler.Filename, handler.Header.Get("Content-Type")))
 
     // bytes, err := ioutil.ReadAll(file)
     // if err != nil {
