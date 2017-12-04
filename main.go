@@ -85,7 +85,9 @@ func toS3(w http.ResponseWriter, r *http.Request, file multipart.File) {
 	bucket := r.FormValue("bucket")
 	log.Printf(bucket)
 
-	sess := session.New()
+	sess := session.New(&aws.Config{
+    Region: aws.String("us-west-2")},
+  )
 	svc := s3manager.NewUploader(sess)
 
 	filename := "abc"
