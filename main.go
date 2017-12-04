@@ -76,57 +76,30 @@ func readFile(w http.ResponseWriter, r *http.Request) {
   }
   defer file.Close()
 
-  fmt.Fprintf(w, fmt.Sprintf("Uploaded: %s, of type %s", handler.Filename, handler.Header.Get("Content-Type")))
+  // fmt.Fprintf(w, fmt.Sprintf("Uploaded: %s, of type %s", handler.Filename, handler.Header.Get("Content-Type")))
 
   return file
-
 }
 
 func toS3(w http.ResponseWriter, r *http.Request, file File) {
   bucket := r.FormValue("bucket")
   log.Printf(bucket)
 
-  sess := session.NewSession(}
+  sess := session.New()
   svc  := s3manager.NewUploader(sess)
 
-  _, err = uploader.Upload(&s3manager.UploadInput{
-      Bucket: aws.String(bucket),
-      Key: aws.String(filename),
-      Body: file,
-  })
+  filename = file.Filename
+
+  _, err =  svc.Upload(
+              &s3manager.UploadInput{
+                Bucket: aws.String(bucket),
+                Key: aws.String(filename),
+                Body: file,
+              }
+            )
   if err != nil {
-      // Print the error and exit.
-      exitErrorf("Unable to upload %q to %q, %v", filename, bucket, err)
+      log.Fatalf("Unable to Upload %s to %s, %s", filename, bucket, err)
   }
 
-  fmt.Printf("Successfully uploaded %q to %q\n", filename, bucket)
-
-
-  }
+  fmt.Fprintf(w, "Successfully Uploaded %s to %s", filename, bucket)
 }
-
-
-// func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-//   bucket := r.URL.Query().Get("bucket")
-//   s3key := r.URL.Query().Get("s3key")
-
-//   sess := session.New()
-//   svc := s3.New(sess)
-//   file, err := svc.GetObject(&s3.GetObjectInput{
-//     Bucket: &bucket,
-//     Key:    &s3key,
-//   })
-//   if err != nil {
-//     http.Error(w, err.Error(), http.StatusInternalServerError)
-//     return
-//   }
-//   defer file.Body.Close()
-
-//   // optional
-//   w.Header().Set("Content-Type", *file.ContentType)
-//   w.Header().Set("ETag", *file.ETag)
-
-//   // streaming
-//   io.Copy(w, file.Body)
-// }
-
