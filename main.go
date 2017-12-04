@@ -20,10 +20,12 @@ import (
 	"net/http"
 	"os"
   "mime/multipart"
+  // "strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go/service/s3"
+  "github.com/aws/aws-sdk-go/aws/awserr"
 	// "github.com/apex/log"
 	// "github.com/apex/log/handlers/json"
 	// "github.com/apex/log/handlers/text"
@@ -82,24 +84,32 @@ func readFile(w http.ResponseWriter, r *http.Request) multipart.File {
 }
 
 func toS3(w http.ResponseWriter, r *http.Request, file multipart.File) {
-	bucket := r.FormValue("bucket")
-	log.Printf(bucket)
+  bucket := r.FormValue("bucket")
+  log.Printf("Bucket: " + bucket)
 
-	sess := session.New(&aws.Config{
+  svc := s3.New(session.New(&aws.Config{
     Region: aws.String("us-west-2")},
-  )
-	svc := s3manager.NewUploader(sess)
+))
+  input := &s3.PutObjectInput{
+    Body:   file,
+    Bucket: aws.String(bucket),
+    Key:    aws.String("abc"),
+  }
 
-	filename := "abc"
+  result, err := svc.PutObject(input)
+  if err != nil {
+    if aerr, ok := err.(awserr.Error); ok {
+      switch aerr.Code() {
+      default:
+        fmt.Println(aerr.Error())
+      }
+    } else {
+      // Print the error, cast err to awserr.Error to get the Code and
+      // Message from an error.
+      fmt.Println(err.Error())
+    }
+    return
+  }
 
-	_, err := svc.Upload(&s3manager.UploadInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(filename),
-		Body:   file})
-
-	if err != nil {
-		log.Fatalf("Unable to Upload %s to %s, %s", filename, bucket, err)
-	}
-
-	fmt.Fprintf(w, "Successfully Uploaded %s to %s", filename, bucket)
+  fmt.Println(result)
 }
