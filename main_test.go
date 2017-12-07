@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -30,7 +31,7 @@ func TestServerServeHTTP(t *testing.T) {
 			expectedJSON: uploadResponse{
 				Bytes:       425,
 				ContentType: "image/jpeg",
-				Geometry:    &geometry4x3,
+				Meta:        uploadMeta{DateTime: "0001-01-01 00:00:00 +0000 UTC", LatLong: "0.000000x0.000000", Geometry: geometry4x3},
 			},
 		},
 		{
@@ -40,7 +41,7 @@ func TestServerServeHTTP(t *testing.T) {
 			expectedJSON: uploadResponse{
 				Bytes:       42,
 				ContentType: "image/gif",
-				Geometry:    &geometry1x1,
+				Meta:        uploadMeta{DateTime: "", LatLong: "", Geometry: geometry1x1},
 			},
 		},
 		{
@@ -48,14 +49,16 @@ func TestServerServeHTTP(t *testing.T) {
 			givenFile:      "testdata/sample.txt",
 			expectedStatus: http.StatusOK,
 			expectedJSON: uploadResponse{
-				Bytes:       42,
-				ContentType: "image/gif",
+				Bytes:       20,
+				ContentType: "text/plain; charset=utf-8",
 			},
 		},
 	}
 
 	for i, tc := range testCases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			log.Println("Running for", tc.givenFile)
+
 			input, err := os.Open(tc.givenFile)
 			if err != nil {
 				t.Fatalf("os.Open(%s): %s", tc.givenFile, err.Error())

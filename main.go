@@ -1,64 +1,74 @@
-// Inspired by:
-// - https://github.com/apex/up-examples/blob/master/oss/golang-uploads/main.go
-// - https://github.com/choonkeat/attache/blob/master/lib/attache/upload.rb
-
-// todos:
-// 1. tests
-// 2. apex logging?
-// 3. validation? prevent image bomb?
-// 4. protect API?
-// 5. exif?
-// 6. documentation
-
 package main
 
 import (
-	// "encoding/base64"
-	// "io/ioutil"
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
+	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
-  "mime/multipart"
-  // "strings"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
-  "github.com/aws/aws-sdk-go/aws/awserr"
-	// "github.com/apex/log"
-	// "github.com/apex/log/handlers/json"
-	// "github.com/apex/log/handlers/text"
+	"github.com/rwcarlsen/goexif/exif"
 )
 
-// Use JSON logging when run by Up (including `up start`).
-// func init() {
-//   if os.Getenv("UP_STAGE") == "" {
-//     log.SetHandler(text.Default)
-//   } else {
-//     log.SetHandler(json.Default)
-//   }
-// }
+type uploadResponse struct {
+	Path        string
+	ContentType string
+	Bytes       int
+	Meta        uploadMeta
+}
+
+type uploadMeta struct {
+	DateTime string
+	LatLong  string
+	Geometry string
+}
+
+type uploadServer struct {
+	region string
+	bucket string
+}
 
 func main() {
-	http.HandleFunc("/", apiRequest)
+	http.Handle("/", uploadServer{region: os.Getenv("AWS_REGION"), bucket: os.Getenv("AWS_BUCKET")})
 
 	log.Printf("Listening to %s...", os.Getenv("PORT"))
-	if err := http.ListenAndServe(":"+os.Getenv("PORT"), nil); err != nil {
-		log.Fatalf(fmt.Sprintf("Error Listening - %s", err))
+	err := http.ListenAndServe(":"+os.Getenv("PORT"), nil)
+	if err != nil {
+		log.Fatalf(err.Error())
 	}
 }
 
-func apiRequest(w http.ResponseWriter, r *http.Request) {
-	log.Printf("%s", r)
-
-	// Validation
-
+func (s uploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "POST", "PUT", "PATCH":
-		file := readFile(w, r) // is this refactoring ok?
+		file, fileType, fileLen := read(w, r)
+		filePath := sendToS3(s.region, s.bucket, file, fileType)
+		fileMeta := meta(file, fileType)
 
-		toS3(w, r, file)
+		log.Println(fileMeta)
+
+		result := uploadResponse{
+			Path:        filePath,
+			ContentType: fileType,
+			Bytes:       fileLen,
+			Meta:        fileMeta,
+		}
+
+		json.NewEncoder(w).Encode(result)
 
 	case "OPTIONS":
 		w.Header().Set("Access-Control-Allow-Methods", "POST, PUT, PATCH, OPTIONS")
@@ -68,48 +78,87 @@ func apiRequest(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func readFile(w http.ResponseWriter, r *http.Request) multipart.File {
-	r.ParseMultipartForm(32 << 20)
-	file, handler, err := r.FormFile("file")
+func read(w http.ResponseWriter, r *http.Request) (*bytes.Reader, string, int) {
+	stream := &bytes.Buffer{}
+	_, err := io.Copy(stream, r.Body)
 	if err != nil {
-		// log.WithError(err).Error("Parsing Form")
-		http.Error(w, fmt.Sprintf("Error Parsing Form - %s", err), http.StatusBadRequest)
-		os.Exit(1)
+		log.Println(err.Error())
 	}
-	defer file.Close()
 
-	fmt.Fprintf(w, fmt.Sprintf("Uploaded: %s, of type %s", handler.Filename, handler.Header.Get("Content-Type")))
+	file := bytes.NewReader(stream.Bytes())
+	fileType := http.DetectContentType(stream.Bytes())
+	fileLen := stream.Len()
 
-	return file
+	return file, fileType, fileLen
 }
 
-func toS3(w http.ResponseWriter, r *http.Request, file multipart.File) {
-  bucket := r.FormValue("bucket")
-  log.Printf("Bucket: " + bucket)
+func sendToS3(region string, bucket string, file *bytes.Reader, fileType string) string {
+	fileName := filename(fileType)
+	filePath := fmt.Sprintf("https://s3-%s.amazonaws.com/%s/%s", region, bucket, fileName)
 
-  svc := s3.New(session.New(&aws.Config{
-    Region: aws.String("us-west-2")},
-))
-  input := &s3.PutObjectInput{
-    Body:   file,
-    Bucket: aws.String(bucket),
-    Key:    aws.String("abc"),
-  }
+	s3Service := s3.New(session.New())
+	s3Options := &s3.PutObjectInput{
+		Bucket: aws.String(bucket),
+		Body:   file,
+		Key:    aws.String(fileName),
+	}
 
-  result, err := svc.PutObject(input)
-  if err != nil {
-    if aerr, ok := err.(awserr.Error); ok {
-      switch aerr.Code() {
-      default:
-        fmt.Println(aerr.Error())
-      }
-    } else {
-      // Print the error, cast err to awserr.Error to get the Code and
-      // Message from an error.
-      fmt.Println(err.Error())
-    }
-    return
-  }
+	_, err := s3Service.PutObject(s3Options)
+	if err != nil {
+		if awsErr, ok := err.(awserr.Error); ok {
+			log.Println(awsErr.Error())
+		} else {
+			log.Println(err.Error())
+		}
+	}
 
-  fmt.Println(result)
+	return filePath
+}
+
+func filename(fileType string) string {
+	// Sorts in Reverse Chrono Order
+	key := strconv.FormatInt((math.MaxInt64 - time.Now().UnixNano()), 10)
+	ext := strings.TrimPrefix(fileType, "image/")
+
+	name := fmt.Sprintf("%s.%s", key, ext)
+
+	return name
+}
+
+func meta(file *bytes.Reader, fileType string) uploadMeta {
+	fileMeta := uploadMeta{DateTime: "", LatLong: "", Geometry: ""}
+
+	if strings.Contains(fileType, "image") {
+		imageMeta(file, &fileMeta)
+	}
+
+	return fileMeta
+}
+
+func imageMeta(file *bytes.Reader, fileMeta *uploadMeta) {
+	x, err := exif.Decode(file)
+	if err != nil {
+		log.Println(err.Error())
+	} else {
+		xDateTime, xerr := x.DateTime()
+		if xerr != nil {
+			log.Println(xerr.Error())
+		}
+		fileMeta.DateTime = xDateTime.String()
+
+		xLat, xLong, xerr := x.LatLong()
+		if xerr != nil {
+			log.Println(xerr.Error())
+		}
+		fileMeta.LatLong = fmt.Sprintf("%fx%f", xLat, xLong)
+	}
+	file.Seek(0, 0)
+
+	imageSrc, _, err := image.DecodeConfig(file)
+	if err != nil {
+		log.Println(err.Error())
+	}
+	file.Seek(0, 0)
+
+	fileMeta.Geometry = fmt.Sprintf("%dx%d", imageSrc.Width, imageSrc.Height)
 }
