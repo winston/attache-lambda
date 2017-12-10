@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"log"
 	"net/http"
@@ -28,7 +30,7 @@ type uploadServer struct {
 }
 
 func main() {
-	http.Handle("/", uploadServer{})
+	http.Handle("/", uploadServer{bucket: os.Getenv("AWS_BUCKET"), region: os.Getenv("AWS_REGION")})
 
 	log.Printf("Listening to %s...", os.Getenv("PORT"))
 	err := http.ListenAndServe(":"+os.Getenv("PORT"), nil)
@@ -40,35 +42,19 @@ func main() {
 func (s uploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "POST", "PUT", "PATCH":
-		buffer := upload(w, r)
+		stream, file := upload(w, r)
 
-		svc := s3.New(session.New())
-		s3i := &s3.PutObjectInput{
-			Body:   buffer,
-			Bucket: aws.String(),
-			Key:    aws.String(),
-		}
+		s3Result := toS3(s.bucket, file)
 
-		result, err := svc.PutObject(s3i)
-		if err != nil {
-			if aerr, ok := err.(awserr.Error); ok {
-				switch aerr.Code() {
-				default:
-					fmt.Println(aerr.Error())
-				}
-			} else {
-				fmt.Println(aerr.Error())
-			}
-			return
-		}
-
-		fmt.Println(result)
+		// rotate
+		// exif
 
 		result := uploadResponse{
-			Path:        fmt.Sprintf("some/path/%s", r.URL.Query().Get("file")),
-			ContentType: http.DetectContentType(buffer.Bytes()),
-			Bytes:       buffer.Len(),
-			// Geometry: "4x3"
+			// Path:        fmt.Sprintf("some/path/%s", r.URL.Query().Get("file")),
+			Path:        s3Result.String(),
+			ContentType: http.DetectContentType(stream.Bytes()),
+			Bytes:       stream.Len(),
+			Geometry:    aws.String("4x2"),
 		}
 
 		json.NewEncoder(w).Encode(result)
@@ -81,12 +67,36 @@ func (s uploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func upload(w http.ResponseWriter, r *http.Request) *bytes.Buffer {
-	buffer := &bytes.Buffer{}
-	_, err := io.Copy(buffer, r.Body)
+func upload(w http.ResponseWriter, r *http.Request) (*bytes.Buffer, *bytes.Reader) {
+	stream := &bytes.Buffer{}
+	_, err := io.Copy(stream, r.Body)
 	if err != nil {
-		log.Printf(err.Error())
+		log.Println(err.Error())
 	}
 
-	return buffer
+	file := bytes.NewReader(stream.Bytes())
+
+	return stream, file
+}
+
+func toS3(bucket string, file *bytes.Reader) *s3.PutObjectOutput {
+	s3Service := s3.New(session.New())
+	s3Options := &s3.PutObjectInput{
+		Bucket: aws.String(bucket),
+		Body:   file,
+		Key:    aws.String("abcd"),
+	}
+
+	s3Result, err := s3Service.PutObject(s3Options)
+	if err != nil {
+		if awsErr, ok := err.(awserr.Error); ok {
+			log.Println(awsErr.Error())
+		} else {
+			log.Println(err.Error())
+		}
+	}
+
+	log.Println(s3Result.String())
+
+	return s3Result
 }
