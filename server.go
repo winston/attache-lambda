@@ -8,8 +8,11 @@ import (
 	_ "image/png"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -42,15 +45,14 @@ func main() {
 func (s uploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "POST", "PUT", "PATCH":
-		stream, file := upload(w, r)
+		stream, file := read(w, r)
 
-		s3Result := toS3(s.bucket, file)
+		s3Result := sendToS3(s.bucket, file)
 
 		// rotate
 		// exif
 
 		result := uploadResponse{
-			// Path:        fmt.Sprintf("some/path/%s", r.URL.Query().Get("file")),
 			Path:        s3Result.String(),
 			ContentType: http.DetectContentType(stream.Bytes()),
 			Bytes:       stream.Len(),
@@ -67,7 +69,7 @@ func (s uploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func upload(w http.ResponseWriter, r *http.Request) (*bytes.Buffer, *bytes.Reader) {
+func read(w http.ResponseWriter, r *http.Request) (*bytes.Buffer, *bytes.Reader) {
 	stream := &bytes.Buffer{}
 	_, err := io.Copy(stream, r.Body)
 	if err != nil {
@@ -79,12 +81,12 @@ func upload(w http.ResponseWriter, r *http.Request) (*bytes.Buffer, *bytes.Reade
 	return stream, file
 }
 
-func toS3(bucket string, file *bytes.Reader) *s3.PutObjectOutput {
+func sendToS3(bucket string, file *bytes.Reader) *s3.PutObjectOutput {
 	s3Service := s3.New(session.New())
 	s3Options := &s3.PutObjectInput{
 		Bucket: aws.String(bucket),
 		Body:   file,
-		Key:    aws.String("abcd"),
+		Key:    filename(),
 	}
 
 	s3Result, err := s3Service.PutObject(s3Options)
@@ -96,7 +98,12 @@ func toS3(bucket string, file *bytes.Reader) *s3.PutObjectOutput {
 		}
 	}
 
-	log.Println(s3Result.String())
-
 	return s3Result
+}
+
+func filename() *string {
+	// Sorts in Reverse Chrono Order
+	key := strconv.FormatInt((math.MaxInt64 - time.Now().UnixNano()), 10)
+	log.Println(key)
+	return &key
 }
