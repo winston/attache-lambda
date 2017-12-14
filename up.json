@@ -3,5 +3,8 @@
   "lambda": {
     "memory": 128
   },
-  "profile": "apex-up"
+  "profile": "apex-up",
+  "environment": {
+    "AWS_BUCKET": "everydaysnap"
+  }
 }
