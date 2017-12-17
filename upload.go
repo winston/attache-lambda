@@ -1,63 +1,85 @@
 package attache
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
-	"io/ioutil"
+	"log"
 	"net/http"
-	"os"
+	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rwcarlsen/goexif/exif"
 )
 
 func (s Server) handleUpload(w http.ResponseWriter, r *http.Request) (result uploadResponse, err error) {
-	// 1. dump into tempfile
-	file, err := ioutil.TempFile(os.TempDir(), "upload")
-	if err != nil {
-		return result, errors.Wrapf(err, "tempfile")
-	}
-	_, err = io.Copy(file, r.Body)
+	stream := &bytes.Buffer{}
+	_, err = io.Copy(stream, r.Body)
 	if err != nil {
 		return result, errors.Wrapf(err, "copy")
 	}
-	defer os.Remove(file.Name())
 	defer r.Body.Close()
 
-	stat, err := file.Stat()
-	if err != nil {
-		return result, errors.Wrapf(err, "stat")
-	}
+	file := bytes.NewReader(stream.Bytes())
+	fileType := http.DetectContentType(stream.Bytes())
+	fileLen := stream.Len()
 
-	file.Seek(0, 0)
-	uniqueKey, err := s.Storage.Upload(file)
+	filePath, err := s.Storage.Upload(file, fileType)
 	if err != nil {
 		return result, errors.Wrapf(err, "upload")
 	}
 
-	file.Seek(0, 0)
-	first512Bytes := make([]byte, 512)
-	_, err = io.ReadFull(file, first512Bytes)
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-		return result, errors.Wrapf(err, "readfull")
-	}
+	fileMeta := meta(file, fileType)
 
 	result = uploadResponse{
-		Path:        uniqueKey,
-		ContentType: http.DetectContentType(first512Bytes),
-		Bytes:       stat.Size(),
-	}
-
-	// rotate
-	// exif
-	file.Seek(0, 0)
-	img, _, err := image.DecodeConfig(file)
-	if err == nil {
-		result.Geometry = fmt.Sprintf("%dx%d", img.Width, img.Height)
+		Path:        filePath,
+		ContentType: fileType,
+		Bytes:       fileLen,
+		Meta:        fileMeta,
 	}
 
 	return result, nil
+}
+
+func meta(file *bytes.Reader, fileType string) uploadMeta {
+	fileMeta := uploadMeta{DateTime: "", LatLong: "", Geometry: ""}
+
+	if strings.Contains(fileType, "image") {
+		imageMeta(file, &fileMeta)
+	}
+
+	return fileMeta
+}
+
+func imageMeta(file *bytes.Reader, fileMeta *uploadMeta) {
+	file.Seek(0, 0)
+
+	x, err := exif.Decode(file)
+	if err != nil {
+		log.Println(err.Error())
+	} else {
+		xDateTime, xerr := x.DateTime()
+		if xerr != nil {
+			log.Println(xerr.Error())
+		}
+		fileMeta.DateTime = xDateTime.String()
+
+		xLat, xLong, xerr := x.LatLong()
+		if xerr != nil {
+			log.Println(xerr.Error())
+		}
+		fileMeta.LatLong = fmt.Sprintf("%fx%f", xLat, xLong)
+	}
+
+	file.Seek(0, 0)
+	imageSrc, _, err := image.DecodeConfig(file)
+	if err != nil {
+		log.Println(err.Error())
+	}
+
+	fileMeta.Geometry = fmt.Sprintf("%dx%d", imageSrc.Width, imageSrc.Height)
 }

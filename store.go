@@ -1,7 +1,7 @@
 package attache
 
-import "io"
+import "bytes"
 
 type Store interface {
-	Upload(w io.ReadSeeker) (uniqueKey string, err error)
+	Upload(file *bytes.Reader, fileType string) (filePath string, err error)
 }

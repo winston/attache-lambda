@@ -1,9 +1,12 @@
 package s3store
 
 import (
-	"io"
+	"bytes"
+	"fmt"
 	"math"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -17,15 +20,28 @@ type Store struct {
 }
 
 // Upload fulfills attache.Store interface
-func (s Store) Upload(r io.ReadSeeker) (string, error) {
-	uniqueKey := strconv.FormatInt((math.MaxInt64 - time.Now().UnixNano()), 10)
+func (s Store) Upload(file *bytes.Reader, fileType string) (string, error) {
+	fileName := filename(fileType)
+	filePath := fmt.Sprintf("https://s3-%s.amazonaws.com/%s/%s", os.Getenv("AWS_REGION"), s.Bucket, fileName)
+
 	// unsure about how long we can cache `svc` or must we really
 	// session.New everytime?
 	svc := s3.New(session.New())
 	_, err := svc.PutObject(&s3.PutObjectInput{
 		Bucket: aws.String(s.Bucket),
-		Body:   r,
-		Key:    &uniqueKey,
+		Body:   file,
+		Key:    &fileName,
 	})
-	return uniqueKey, err
+
+	return filePath, err
+}
+
+func filename(fileType string) string {
+	// Sorts in Reverse Chrono Order
+	key := strconv.FormatInt((math.MaxInt64 - time.Now().UnixNano()), 10)
+	ext := strings.TrimPrefix(fileType, "image/")
+
+	name := fmt.Sprintf("%s.%s", key, ext)
+
+	return name
 }

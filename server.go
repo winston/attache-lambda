@@ -8,8 +8,14 @@ import (
 type uploadResponse struct {
 	Path        string
 	ContentType string
-	Bytes       int64
-	Geometry    string `json:"geometry,omitempty"` // instead of *string
+	Bytes       int
+	Meta        uploadMeta
+}
+
+type uploadMeta struct {
+	DateTime string
+	LatLong  string
+	Geometry string
 }
 
 // Server handles upload and download

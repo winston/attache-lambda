@@ -4,7 +4,7 @@
 package attache
 
 import (
-	"io"
+	"bytes"
 	"io/ioutil"
 
 	uuid "github.com/satori/go.uuid"
@@ -21,8 +21,8 @@ func newDummyStore() *dummyStore {
 }
 
 // Upload fulfills attache.Store interface
-func (s *dummyStore) Upload(r io.ReadSeeker) (string, error) {
-	data, err := ioutil.ReadAll(r)
+func (s *dummyStore) Upload(file *bytes.Reader, fileType string) (string, error) {
+	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		return "", err
 	}
