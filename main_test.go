@@ -1,8 +1,12 @@
-package main
+package attache
 
 import (
 	"encoding/json"
+<<<<<<< HEAD:main_test.go
 	"log"
+=======
+	"io/ioutil"
+>>>>>>> 8daa629... Refactor to use attache.Server{ Storage }:server_test.go
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -31,7 +35,11 @@ func TestServerServeHTTP(t *testing.T) {
 			expectedJSON: uploadResponse{
 				Bytes:       425,
 				ContentType: "image/jpeg",
+<<<<<<< HEAD:main_test.go
 				Meta:        uploadMeta{DateTime: "0001-01-01 00:00:00 +0000 UTC", LatLong: "0.000000x0.000000", Geometry: geometry4x3},
+=======
+				Geometry:    geometry4x3,
+>>>>>>> 8daa629... Refactor to use attache.Server{ Storage }:server_test.go
 			},
 		},
 		{
@@ -41,7 +49,11 @@ func TestServerServeHTTP(t *testing.T) {
 			expectedJSON: uploadResponse{
 				Bytes:       42,
 				ContentType: "image/gif",
+<<<<<<< HEAD:main_test.go
 				Meta:        uploadMeta{DateTime: "", LatLong: "", Geometry: geometry1x1},
+=======
+				Geometry:    geometry1x1,
+>>>>>>> 8daa629... Refactor to use attache.Server{ Storage }:server_test.go
 			},
 		},
 		{
@@ -67,11 +79,15 @@ func TestServerServeHTTP(t *testing.T) {
 
 			r := httptest.NewRequest("POST", tc.givenURI, input)
 			w := httptest.NewRecorder()
-			s := uploadServer{}
+			s := Server{Storage: newDummyStore()}
 			s.ServeHTTP(w, r)
 
 			result := w.Result()
 			assert.Equal(t, tc.expectedStatus, result.StatusCode, "http status")
+			if result.StatusCode != http.StatusOK {
+				body, err := ioutil.ReadAll(result.Body)
+				t.Fatalf("%s %#v", body, err)
+			}
 
 			var actual uploadResponse
 			if err = json.NewDecoder(result.Body).Decode(&actual); err != nil {
