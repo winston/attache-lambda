@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	attache "github.com/winston/attache-lambda"
 )
 
 // Store uses s3 as backing store
@@ -45,3 +46,6 @@ func filename(fileType string) string {
 
 	return name
 }
+
+// compile-time check that we implement attache.Store interface
+var _ attache.Store = Store{}
