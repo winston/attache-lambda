@@ -28,7 +28,7 @@ func (s Server) handleUpload(w http.ResponseWriter, r *http.Request) (result upl
 	fileType := http.DetectContentType(stream.Bytes())
 	fileLen := stream.Len()
 
-	filePath, err := s.Storage.Upload(file, fileType)
+	filePath, err := s.Storage.Upload(r.Context(), file, fileType)
 	if err != nil {
 		return result, errors.Wrapf(err, "upload")
 	}

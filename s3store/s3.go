@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -21,14 +23,14 @@ type Store struct {
 }
 
 // Upload fulfills attache.Store interface
-func (s Store) Upload(file *bytes.Reader, fileType string) (string, error) {
+func (s Store) Upload(ctx context.Context, file *bytes.Reader, fileType string) (string, error) {
 	fileName := filename(fileType)
 	filePath := fmt.Sprintf("https://s3-%s.amazonaws.com/%s/%s", os.Getenv("AWS_REGION"), s.Bucket, fileName)
 
 	// unsure about how long we can cache `svc` or must we really
 	// session.New everytime?
 	svc := s3.New(session.New())
-	_, err := svc.PutObject(&s3.PutObjectInput{
+	_, err := svc.PutObjectWithContext(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.Bucket),
 		Body:   file,
 		Key:    &fileName,
