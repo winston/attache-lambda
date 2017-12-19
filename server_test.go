@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	geometry4x3 = "4x3"
+	geometry3x4 = "3x4"
 	geometry1x1 = "1x1"
 )
 
@@ -32,7 +32,7 @@ func TestServerServeHTTP(t *testing.T) {
 			expectedJSON: uploadResponse{
 				Bytes:       425,
 				ContentType: "image/jpeg",
-				Meta:        uploadMeta{DateTime: "0001-01-01 00:00:00 +0000 UTC", LatLong: "0.000000x0.000000", Geometry: geometry4x3},
+				Meta:        uploadMeta{DateTime: "0001-01-01 00:00:00 +0000 UTC", LatLong: "0.000000x0.000000", Geometry: geometry3x4},
 			},
 		},
 		{
