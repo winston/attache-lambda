@@ -4,6 +4,7 @@
 package attache
 
 import (
+	"bytes"
 	"io"
 	"io/ioutil"
 
@@ -34,6 +35,16 @@ func (s *dummyStore) Upload(ctx context.Context, file io.ReadSeeker, fileType st
 	s.LastUniqueKey = uniqueKey
 	s.hash[uniqueKey] = data
 	return uniqueKey, nil
+}
+
+// Download fulfills attache.Store interface
+func (s *dummyStore) Download(ctx context.Context, filePath string) (io.ReadCloser, error) {
+	data, ok := s.hash[filePath]
+	if !ok {
+		return nil, nil
+	}
+
+	return ioutil.NopCloser(bytes.NewReader(data)), nil
 }
 
 // compile-time check that we implement attache.Store interface

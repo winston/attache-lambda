@@ -29,6 +29,12 @@ func TestHandleDownload(t *testing.T) {
 			expectedStatus:   http.StatusOK,
 			expectedFile:     "testdata/transparent.gif",
 		},
+		{
+			givenURI:         "/wrong.txt?%s",
+			givenFile:        "testdata/transparent.gif",
+			givenContentType: "image/gif",
+			expectedStatus:   http.StatusNotFound,
+		},
 	}
 
 	for i, tc := range testCases {
@@ -48,6 +54,9 @@ func TestHandleDownload(t *testing.T) {
 
 			result := w.Result()
 			assert.Equal(t, tc.expectedStatus, result.StatusCode)
+			if result.StatusCode != http.StatusOK {
+				return
+			}
 
 			expectedBytes, err := ioutil.ReadFile(tc.expectedFile)
 			if err != nil {

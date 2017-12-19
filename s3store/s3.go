@@ -11,9 +11,11 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/oklog/ulid"
+	"github.com/pkg/errors"
 	attache "github.com/winston/attache-lambda"
 )
 
@@ -37,6 +39,27 @@ func (s Store) Upload(ctx context.Context, file io.ReadSeeker, fileType string) 
 	})
 
 	return filePath, err
+}
+
+// Download fulfills attache.Store interface
+func (s Store) Download(ctx context.Context, filePath string) (io.ReadCloser, error) {
+	svc := s3.New(session.New())
+	result, err := svc.GetObjectWithContext(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.Bucket),
+		Key:    &filePath,
+	})
+	if e, ok := err.(awserr.Error); ok {
+		if e.Code() == s3.ErrCodeNoSuchKey ||
+			e.Code() == s3.ErrCodeNoSuchBucket ||
+			e.Code() == s3.ErrCodeNoSuchUpload {
+			return nil, nil
+		}
+	}
+	if err != nil {
+		return nil, errors.Wrapf(err, "get object: %#v", filePath)
+	}
+
+	return result.Body, nil
 }
 
 func filename(fileType string) string {

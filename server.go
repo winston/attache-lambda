@@ -33,6 +33,9 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		json.NewEncoder(w).Encode(result)
 
+	case "GET":
+		s.handleDownload(w, r)
+
 	case "OPTIONS":
 		w.Header().Set("Access-Control-Allow-Methods", "POST, PUT, PATCH, OPTIONS")
 
