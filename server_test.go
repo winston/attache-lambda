@@ -1,7 +1,9 @@
-package main
+package attache
 
 import (
 	"encoding/json"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,7 +14,7 @@ import (
 )
 
 var (
-	geometry4x3 = "4x3"
+	geometry3x4 = "3x4"
 	geometry1x1 = "1x1"
 )
 
@@ -30,7 +32,7 @@ func TestServerServeHTTP(t *testing.T) {
 			expectedJSON: uploadResponse{
 				Bytes:       425,
 				ContentType: "image/jpeg",
-				Geometry:    &geometry4x3,
+				Meta:        uploadMeta{DateTime: "0001-01-01 00:00:00 +0000 UTC", LatLong: "0.000000x0.000000", Geometry: geometry3x4},
 			},
 		},
 		{
@@ -40,7 +42,7 @@ func TestServerServeHTTP(t *testing.T) {
 			expectedJSON: uploadResponse{
 				Bytes:       42,
 				ContentType: "image/gif",
-				Geometry:    &geometry1x1,
+				Meta:        uploadMeta{DateTime: "", LatLong: "", Geometry: geometry1x1},
 			},
 		},
 		{
@@ -48,14 +50,16 @@ func TestServerServeHTTP(t *testing.T) {
 			givenFile:      "testdata/sample.txt",
 			expectedStatus: http.StatusOK,
 			expectedJSON: uploadResponse{
-				Bytes:       42,
-				ContentType: "image/gif",
+				Bytes:       20,
+				ContentType: "text/plain; charset=utf-8",
 			},
 		},
 	}
 
 	for i, tc := range testCases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			log.Println("Running for", tc.givenFile)
+
 			input, err := os.Open(tc.givenFile)
 			if err != nil {
 				t.Fatalf("os.Open(%s): %s", tc.givenFile, err.Error())
@@ -64,11 +68,15 @@ func TestServerServeHTTP(t *testing.T) {
 
 			r := httptest.NewRequest("POST", tc.givenURI, input)
 			w := httptest.NewRecorder()
-			s := uploadServer{}
+			s := Server{Storage: newDummyStore()}
 			s.ServeHTTP(w, r)
 
 			result := w.Result()
 			assert.Equal(t, tc.expectedStatus, result.StatusCode, "http status")
+			if result.StatusCode != http.StatusOK {
+				body, err := ioutil.ReadAll(result.Body)
+				t.Fatalf("%s %#v", body, err)
+			}
 
 			var actual uploadResponse
 			if err = json.NewDecoder(result.Body).Decode(&actual); err != nil {

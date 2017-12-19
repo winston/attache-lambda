@@ -1,8 +1,7 @@
-package main
+package attache
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 )
 
@@ -10,18 +9,34 @@ type uploadResponse struct {
 	Path        string
 	ContentType string
 	Bytes       int
-	Geometry    *string
+	Meta        uploadMeta
 }
 
-type uploadServer struct {
-	bucket string
-	region string
+type uploadMeta struct {
+	DateTime string
+	LatLong  string
+	Geometry string
 }
 
-func (s uploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	result := uploadResponse{
-		Path: fmt.Sprintf("some/path/%s", r.URL.Query().Get("file")),
+// Server handles upload and download
+type Server struct {
+	Storage Store
+}
+
+func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "POST", "PUT", "PATCH":
+		result, err := s.handleUpload(w, r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(result)
+
+	case "OPTIONS":
+		w.Header().Set("Access-Control-Allow-Methods", "POST, PUT, PATCH, OPTIONS")
+
+	default:
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 	}
-
-	json.NewEncoder(w).Encode(result)
 }
