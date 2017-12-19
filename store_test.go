@@ -13,7 +13,8 @@ import (
 )
 
 type dummyStore struct {
-	hash map[string][]byte // default is `nil`
+	hash          map[string][]byte // default is `nil`
+	LastUniqueKey string
 }
 
 func newDummyStore() *dummyStore {
@@ -30,6 +31,7 @@ func (s *dummyStore) Upload(ctx context.Context, file io.ReadSeeker, fileType st
 	}
 
 	uniqueKey := uuid.NewV4().String()
+	s.LastUniqueKey = uniqueKey
 	s.hash[uniqueKey] = data
 	return uniqueKey, nil
 }
