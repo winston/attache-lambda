@@ -30,7 +30,7 @@ func (s Store) Upload(ctx context.Context, file *bytes.Reader, fileType string) 
 	// unsure about how long we can cache `svc` or must we really
 	// session.New everytime?
 	svc := s3.New(session.New())
-	_, err := svc.PutObject(&s3.PutObjectInput{
+	_, err := svc.PutObjectWithContext(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.Bucket),
 		Body:   file,
 		Key:    &fileName,
