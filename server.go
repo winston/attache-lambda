@@ -20,7 +20,8 @@ type uploadMeta struct {
 
 // Server handles upload and download
 type Server struct {
-	Storage Store
+	Storage       Store
+	GetPrefixPath string // e.g. `/execute?` we strip away this prefix before we extract `filePath`
 }
 
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -32,6 +33,9 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		json.NewEncoder(w).Encode(result)
+
+	case "GET":
+		s.handleDownload(w, r)
 
 	case "OPTIONS":
 		w.Header().Set("Access-Control-Allow-Methods", "POST, PUT, PATCH, OPTIONS")

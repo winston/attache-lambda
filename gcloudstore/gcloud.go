@@ -1,7 +1,6 @@
 package gcloudstore
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"math"
@@ -30,7 +29,7 @@ func NewStore(bucketName string) Store {
 }
 
 // Upload fulfills attache.Store interface
-func (s Store) Upload(ctx context.Context, src *bytes.Reader, fileType string) (string, error) {
+func (s Store) Upload(ctx context.Context, src io.ReadSeeker, fileType string) (string, error) {
 	fileName := filename(fileType)
 
 	client, err := storage.NewClient(ctx)
@@ -47,6 +46,23 @@ func (s Store) Upload(ctx context.Context, src *bytes.Reader, fileType string) (
 	}
 
 	return fileName, nil
+}
+
+// Download fulfills attache.Store interface
+func (s Store) Download(ctx context.Context, filePath string) (io.ReadCloser, error) {
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return nil, errors.Wrapf(err, "storage newclient")
+	}
+	body, err := client.Bucket(s.bucketName).Object(filePath).NewReader(ctx)
+	if err == storage.ErrBucketNotExist || err == storage.ErrObjectNotExist {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrapf(err, "storage newreader")
+	}
+
+	return body, nil
 }
 
 func filename(fileType string) string {

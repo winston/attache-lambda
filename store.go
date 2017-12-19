@@ -1,11 +1,12 @@
 package attache
 
 import (
-	"bytes"
+	"io"
 
 	"golang.org/x/net/context"
 )
 
 type Store interface {
-	Upload(ctx context.Context, file *bytes.Reader, fileType string) (filePath string, err error)
+	Upload(ctx context.Context, file io.ReadSeeker, fileType string) (filePath string, err error)
+	Download(ctx context.Context, filePath string) (io.ReadCloser, error) // should return `nil, nil` for when `filePath` is not found
 }
