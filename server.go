@@ -20,7 +20,8 @@ type uploadMeta struct {
 
 // Server handles upload and download
 type Server struct {
-	Storage Store
+	Storage       Store
+	GetPrefixPath string // e.g. `/execute?` we strip away this prefix before we extract `filePath`
 }
 
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
