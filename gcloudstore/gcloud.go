@@ -30,10 +30,9 @@ func NewStore(bucketName string) Store {
 }
 
 // Upload fulfills attache.Store interface
-func (s Store) Upload(src *bytes.Reader, fileType string) (string, error) {
+func (s Store) Upload(ctx context.Context, src *bytes.Reader, fileType string) (string, error) {
 	fileName := filename(fileType)
 
-	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		return "", errors.Wrapf(err, "storage newclient")
