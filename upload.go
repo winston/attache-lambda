@@ -8,7 +8,6 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 
@@ -33,7 +32,7 @@ func (s Server) handleUpload(w http.ResponseWriter, r *http.Request) (result upl
 		return result, errors.Wrapf(err, "upload")
 	}
 
-	fileMeta := meta(file, fileType)
+	fileMeta := extractFileMeta(file, fileType)
 
 	result = uploadResponse{
 		Path:        filePath,
@@ -45,10 +44,10 @@ func (s Server) handleUpload(w http.ResponseWriter, r *http.Request) (result upl
 	return result, nil
 }
 
-func meta(file *bytes.Reader, fileType string) uploadMeta {
-	fileMeta := uploadMeta{DateTime: "", LatLong: "", Geometry: ""}
+func extractFileMeta(file *bytes.Reader, fileType string) uploadMeta {
+	fileMeta := uploadMeta{}
 
-	if strings.Contains(fileType, "image") {
+	if strings.HasPrefix(fileType, "image/") {
 		imageMeta(file, &fileMeta)
 	}
 
@@ -57,29 +56,18 @@ func meta(file *bytes.Reader, fileType string) uploadMeta {
 
 func imageMeta(file *bytes.Reader, fileMeta *uploadMeta) {
 	file.Seek(0, 0)
-
 	x, err := exif.Decode(file)
-	if err != nil {
-		log.Println(err.Error())
-	} else {
-		xDateTime, xerr := x.DateTime()
-		if xerr != nil {
-			log.Println(xerr.Error())
-		}
+	if err == nil {
+		xDateTime, _ := x.DateTime()
 		fileMeta.DateTime = xDateTime.String()
 
-		xLat, xLong, xerr := x.LatLong()
-		if xerr != nil {
-			log.Println(xerr.Error())
-		}
+		xLat, xLong, _ := x.LatLong()
 		fileMeta.LatLong = fmt.Sprintf("%fx%f", xLat, xLong)
 	}
 
 	file.Seek(0, 0)
 	imageSrc, _, err := image.DecodeConfig(file)
-	if err != nil {
-		log.Println(err.Error())
+	if err == nil {
+		fileMeta.Geometry = fmt.Sprintf("%dx%d", imageSrc.Width, imageSrc.Height)
 	}
-
-	fileMeta.Geometry = fmt.Sprintf("%dx%d", imageSrc.Width, imageSrc.Height)
 }

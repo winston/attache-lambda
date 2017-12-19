@@ -3,9 +3,8 @@ package s3store
 import (
 	"bytes"
 	"fmt"
-	"math"
+	"math/rand"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/oklog/ulid"
 	attache "github.com/winston/attache-lambda"
 )
 
@@ -40,8 +40,10 @@ func (s Store) Upload(ctx context.Context, file *bytes.Reader, fileType string) 
 }
 
 func filename(fileType string) string {
-	// Sorts in Reverse Chrono Order
-	key := strconv.FormatInt((math.MaxInt64 - time.Now().UnixNano()), 10)
+	current := time.Now()
+	entropy := rand.New(rand.NewSource(current.UnixNano()))
+	key := ulid.MustNew(ulid.Timestamp(current), entropy)
+
 	ext := strings.TrimPrefix(fileType, "image/")
 
 	name := fmt.Sprintf("%s.%s", key, ext)
