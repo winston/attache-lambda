@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"io/ioutil"
 
+	"golang.org/x/net/context"
+
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -21,7 +23,7 @@ func newDummyStore() *dummyStore {
 }
 
 // Upload fulfills attache.Store interface
-func (s *dummyStore) Upload(file *bytes.Reader, fileType string) (string, error) {
+func (s *dummyStore) Upload(ctx context.Context, file *bytes.Reader, fileType string) (string, error) {
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		return "", err
@@ -31,3 +33,6 @@ func (s *dummyStore) Upload(file *bytes.Reader, fileType string) (string, error)
 	s.hash[uniqueKey] = data
 	return uniqueKey, nil
 }
+
+// compile-time check that we implement attache.Store interface
+var _ Store = newDummyStore()
