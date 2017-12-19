@@ -1,8 +1,8 @@
 package s3store
 
 import (
-	"bytes"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"strings"
@@ -23,7 +23,7 @@ type Store struct {
 }
 
 // Upload fulfills attache.Store interface
-func (s Store) Upload(ctx context.Context, file *bytes.Reader, fileType string) (string, error) {
+func (s Store) Upload(ctx context.Context, file io.ReadSeeker, fileType string) (string, error) {
 	fileName := filename(fileType)
 	filePath := fmt.Sprintf("https://s3-%s.amazonaws.com/%s/%s", os.Getenv("AWS_REGION"), s.Bucket, fileName)
 

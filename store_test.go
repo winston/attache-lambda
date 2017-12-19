@@ -4,7 +4,7 @@
 package attache
 
 import (
-	"bytes"
+	"io"
 	"io/ioutil"
 
 	"golang.org/x/net/context"
@@ -23,7 +23,7 @@ func newDummyStore() *dummyStore {
 }
 
 // Upload fulfills attache.Store interface
-func (s *dummyStore) Upload(ctx context.Context, file *bytes.Reader, fileType string) (string, error) {
+func (s *dummyStore) Upload(ctx context.Context, file io.ReadSeeker, fileType string) (string, error) {
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		return "", err

@@ -1,7 +1,6 @@
 package gcloudstore
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"math"
@@ -30,7 +29,7 @@ func NewStore(bucketName string) Store {
 }
 
 // Upload fulfills attache.Store interface
-func (s Store) Upload(ctx context.Context, src *bytes.Reader, fileType string) (string, error) {
+func (s Store) Upload(ctx context.Context, src io.ReadSeeker, fileType string) (string, error) {
 	fileName := filename(fileType)
 
 	client, err := storage.NewClient(ctx)
